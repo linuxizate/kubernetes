@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-cm
+  labels:
+    name: pod-cm
+spec:
+  containers:
+    - name: pod-cm
+      image: nginx
+      resources:
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+      ports:
+        - containerPort: 80
+      env:
+        - name: ENVORINMENT_TEST
+          valueFrom:
+            configMapKeyRef:
+              name: test-cm
+              key: variable1
+        - name: ENVORINMENT_TEST2
+          valueFrom:
+            configMapKeyRef:
+              name: test-cm02
+              key: variable2

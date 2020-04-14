@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: replication
+  labels:
+    project: replication02
+    environment: production
+spec:
+  replicas: 6
+  selector:
+    environment: production
+  template:
+    metadata:
+      labels:
+        project: web
+        environment: production
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80

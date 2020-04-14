@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend
+spec:
+  containers:
+    - name: web-nginx
+      image: nginx
+      resources:
+        requests:
+          memory: "512M"
+          cpu: "250m"
+        limits:
+          memory: "718M"
+          cpu: "300m"

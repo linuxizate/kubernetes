@@ -1,0 +1,20 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: pod-01
+  labels:
+    environment: test
+    app: nginx
+spec:
+  volumes:
+    - name: pv-storage
+      persistentVolumeClaim:
+        claimName: vpc-volume-01
+  containers:
+    - name: web01
+      image: javiermanzanares/helloworld:latest
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - mountPath: "/usr/shared/nginx/html"
+          name: pv-storage
