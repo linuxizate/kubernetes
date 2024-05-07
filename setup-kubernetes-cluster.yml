@@ -1,0 +1,121 @@
+---
+- name: Configuración completa del clúster de Kubernetes
+  hosts: all
+  become: yes
+  tasks:
+    - name: Actualizar todos los paquetes
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Deshabilitar swap
+      command: swapoff -a
+      ignore_errors: yes
+
+    - name: Comentar la entrada swap en fstab
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^(.+\s+swap\s+.+)$'
+        line: '#\1'
+        backup: yes
+
+    - name: Cargar módulos del kernel
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Configurar parámetros del kernel para Kubernetes
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+        - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+        - { name: 'net.ipv4.ip_forward', value: '1' }
+    - name: Instalar dependencias
+      apt:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - curl
+        - gnupg2
+        - software-properties-common
+        - apt-transport-https
+        - ca-certificates
+
+    - name: Agregar el repositorio Docker para Containerd
+      block:
+        - name: Añadir GPG key de Docker
+          apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+
+        - name: Añadir repositorio de Docker
+          apt_repository:
+            repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            state: present
+            update_cache: yes
+
+    - name: Instalar Containerd
+      apt:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - containerd.io
+
+    - name: Configurar containerd para usar systemd
+      block:
+        - name: Generar configuración predeterminada de containerd
+          command: containerd config default
+          args:
+            creates: /etc/containerd/config.toml
+
+        - name: Establecer SystemdCgroup a true
+          lineinfile:
+            path: /etc/containerd/config.toml
+            regexp: '^SystemdCgroup = false'
+            line: 'SystemdCgroup = true'
+            backup: yes
+    - name: Reiniciar y habilitar el servicio de containerd
+      systemd:
+        name: containerd
+        state: restarted
+        enabled: yes
+
+    - name: Agregar repositorio de Kubernetes
+      block:
+        - name: Agregar la clave GPG de Kubernetes
+          apt_key:
+            url: https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key
+            state: present
+
+        - name: Añadir repositorio de Kubernetes
+          apt_repository:
+            repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb /"
+            state: present
+            filename: kubernetes.list
+            update_cache: yes
+
+    - name: Instalar kubectl, kubeadm y kubelet
+      apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: yes
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Mantener versiones de kubelet, kubeadm y kubectl
+      apt:
+        name: "{{ item }}"
+        state: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
