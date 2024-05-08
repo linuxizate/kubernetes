@@ -1,6 +1,6 @@
 ---
 - name: Configuración completa del clúster de Kubernetes
-  hosts: all
+  hosts: workers
   become: yes
   tasks:
     - name: Actualizar todos los paquetes
@@ -76,11 +76,10 @@
             creates: /etc/containerd/config.toml
 
         - name: Establecer SystemdCgroup a true
-          lineinfile:
-            path: /etc/containerd/config.toml
-            regexp: '^SystemdCgroup = false'
-            line: 'SystemdCgroup = true'
-            backup: yes
+          shell: |
+                 containerd config default | sudo tee /etc/containerd/config.toml >/dev/null 2>&1
+                 sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+
     - name: Reiniciar y habilitar el servicio de containerd
       systemd:
         name: containerd
@@ -90,9 +89,8 @@
     - name: Agregar repositorio de Kubernetes
       block:
         - name: Agregar la clave GPG de Kubernetes
-          apt_key:
-            url: https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key
-            state: present
+          ansible.builtin.shell: |
+                                 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
         - name: Añadir repositorio de Kubernetes
           apt_repository:
@@ -112,10 +110,5 @@
         - kubectl
 
     - name: Mantener versiones de kubelet, kubeadm y kubectl
-      apt:
-        name: "{{ item }}"
-        state: hold
-      loop:
-        - kubelet
-        - kubeadm
-        - kubectl
+      shell: |
+             apt-mark hold kubelet kubeadm kubectl
